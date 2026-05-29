@@ -1,0 +1,17 @@
+{
+  "name": "shotgame",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "three": "^0.184.0",
+    "vite": "^8.0.12"
+  }
+}
