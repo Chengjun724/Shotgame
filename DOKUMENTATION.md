@@ -14,8 +14,10 @@
 8. Hur är kartan byggd?
 9. Hur fungerar figurerna?
 10. Hur fungerar kollisionen?
-11. Lärdomar och utmaningar
-12. Reflektioner
+11. Hur fungerar fiendernas AI (chase)?
+12. Hur fungerar livsystemet och game over?
+13. Lärdomar och utmaningar
+14. Reflektioner
 
 ---
 
@@ -229,10 +231,7 @@ if (targets.length === 0) spawnAll();
 ```
 
 **Rörelsesläge (AI):**
-Spelaren kan trycka **M** för att aktivera ett läge där figurerna vandrar runt. Logiken är enkel:
-- Välj en slumpmässig riktning
-- Gå i den riktningen
-- Om du träffar en vägg — välj ny riktning
+Spelaren kan trycka **M** för att aktivera ett läge där figurerna jagar spelaren aktivt. Se avsnitt 11 för hur det fungerar.
 
 ---
 
@@ -264,7 +263,70 @@ if (!kollision(nuvarandeX, nyZ)) flytta Z
 
 ---
 
-## 11. Lärdomar och utmaningar
+## 11. Hur fungerar fiendernas AI (chase)?
+
+När spelaren trycker **M** aktiveras "Jaga"-läget. Då slutar figurerna stå stilla — istället springer varje figur direkt mot spelaren varje frame.
+
+Logiken är enkel men effektiv:
+
+```javascript
+// Beräkna riktning från figuren mot spelaren
+const dx = spelare.x - figur.x;
+const dz = spelare.z - figur.z;
+const avstånd = Math.sqrt(dx*dx + dz*dz);
+
+// Normalisera (gör om till en riktning med längd 1)
+const dirX = dx / avstånd;
+const dirZ = dz / avstånd;
+
+// Flytta figuren ett litet steg i den riktningen
+figur.x += dirX * hastighet * deltaTime;
+figur.z += dirZ * hastighet * deltaTime;
+```
+
+Figuren tittar också mot spelaren automatiskt med `lookAt()`, så den alltid "vänder ansiktet" mot dig.
+
+**Väggar stoppar fienderna:**
+Precis som spelaren använder figurerna AABB-kollision (se avsnitt 10). Om vägen till spelaren blockeras av en vägg stannar de — de är inte smarta nog att gå runt hinder.
+
+**Lärdom:** Chase-AI lät avancerat men visade sig vara ett av de enklaste systemen att implementera. Det enda som krävs är en riktningsvektor och lite matematik. Det är ett bra exempel på hur spel-AI i grunden är enkel matematik, inte magi.
+
+---
+
+## 12. Hur fungerar livsystemet och game over?
+
+Spelaren börjar med **100 HP** (hälsopoäng). Om en fiende i jaga-läge kommer tillräckligt nära tar spelaren skada.
+
+**Skadelogik:**
+```javascript
+// Om fienden är inom 1.2 meter:
+if (avstånd < 1.2 && avkylningstid <= 0) {
+    spelaren.hp -= 10;
+    avkylningstid = 1.0;  // vänta 1 sekund innan nästa träff
+}
+```
+
+`avkylningstid` är viktigt — utan den hade spelaren tappat alla 100 HP på under en sekund eftersom spelet uppdateras 60 gånger per sekund.
+
+**Skade-feedback (röd blink):**
+När spelaren tar skada blinkar hela skärmen rött i en bråkdel av en sekund. Det är en CSS-animation som startas om varje gång skada sker:
+
+```css
+@keyframes flash {
+    0%   { opacity: 1; }   /* Helt röd */
+    100% { opacity: 0; }   /* Tonar bort */
+}
+```
+
+**Game over:**
+Om HP når 0 visas en svart skärm med texten "GAME OVER", antal träffar och en knapp för att starta om. Spelet stoppas och musen låses upp så spelaren kan klicka på knappen.
+
+**HP visas i HUD:**
+Längst upp till vänster på skärmen syns alltid ❤ och aktuella HP, uppdaterat i realtid.
+
+---
+
+## 13. Lärdomar och utmaningar
 
 ### Lärdomar
 
@@ -290,14 +352,12 @@ Utan deltaTime rör sig spelet olika fort på olika datorer. Det är en liten sa
 | Spelaren fastnade i hörn | Kollisionen blockerade helt | Testade X och Z separat (axis-separation) |
 | Kartbygge utan visuellt verktyg | Svårt att placera väggar rätt | Testa → justera koordinater → testa igen |
 | Figurer gick genom väggar | Ingen kollision för figurer | Lade till AABB-check i updatePersons() |
+| Skada varje frame | Utan tidsbegränsning tömdes HP på 0,1 sekund | Lade till `damageCooldown` — max en träff per sekund |
+| CSS-animation startade inte om | `classList.add('active')` fungerade inte om klassen redan fanns | Tvingade reflow med `void element.offsetWidth` innan animationen återstartades |
 
 ---
 
-*Dokumentet beskriver Checkpoint 1 av projektet. Checkpoint 2 (fiende-AI, livsystem, game over) återstår.*
-
----
-
-## 12. Reflektioner
+## 14. Reflektioner
 
 ### Vad gick bra?
 

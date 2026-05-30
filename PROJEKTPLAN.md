@@ -30,14 +30,14 @@ Körs direkt i webbläsaren. Kod hanteras via GitHub.
 
 ## VAD SOM ÅTERSTÅR
 
-### Checkpoint 2 — MÅL
+### Checkpoint 2 — KLAR (2026-05-29)
 Från projektbeskrivningen: *"fiender med enkel AI samt ett fungerande livsystem. Spelet ska kännas som en spelbar prototyp."*
 
-- [ ] **Fiendens AI** — fiender rör sig aktivt mot spelaren (chase-beteende)
-- [ ] **Livsystem** — spelaren har 100 HP, förlorar HP när fiende når spelaren
-- [ ] **HP-display i HUD** — visa spelarens liv (t.ex. "❤ 100")
-- [ ] **Skada-feedback** — skärmen blinkar rött när spelaren tar skada
-- [ ] **Game over-skärm** — visas när HP når 0, med alternativ att starta om
+- [x] **Fiendens AI** — fiender rör sig aktivt mot spelaren (chase-beteende)
+- [x] **Livsystem** — spelaren har 100 HP, förlorar HP när fiende når spelaren
+- [x] **HP-display i HUD** — visa spelarens liv (t.ex. "❤ 100")
+- [x] **Skada-feedback** — skärmen blinkar rött när spelaren tar skada
+- [x] **Game over-skärm** — visas när HP når 0, med alternativ att starta om
 
 ### Slutmål — Slutpresentation
 Från projektbeskrivningen: *"ett fungerande spel där alla grundfunktioner finns på plats"*

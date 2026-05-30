@@ -221,6 +221,29 @@ makeWall(1.5, 6, 1.5,  12, -8, brickMat);
 makeWall(1.5, 4, 1.5, -12,  4, concreteMat);
 makeWall(1.5, 4, 1.5,  12,  4, concreteMat);
 
+// --- Kollision ---
+const wallBoxes = walls.map(w => new THREE.Box3().setFromObject(w));
+
+function hasCollision(x, z, halfW = 0.4) {
+  const box = new THREE.Box3(
+    new THREE.Vector3(x - halfW, 0.05, z - halfW),
+    new THREE.Vector3(x + halfW, 2.2,  z + halfW)
+  );
+  for (const wb of wallBoxes) {
+    if (box.intersectsBox(wb)) return true;
+  }
+  return false;
+}
+
+function randomValidPos() {
+  for (let i = 0; i < 50; i++) {
+    const x = randomPos();
+    const z = randomPos();
+    if (!hasCollision(x, z, 0.6)) return { x, z };
+  }
+  return { x: 0, z: 10 }; // fallback
+}
+
 const targets = [];
 
 function makePerson(x, z) {
@@ -268,11 +291,59 @@ function makePerson(x, z) {
   legR.position.set(0.15, 0.45, 0);
   group.add(legR);
 
+  // Vapen i höger hand
+  const eGunMat  = new THREE.MeshLambertMaterial({ color: 0x222222 });
+  const eBarrMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+  const eGun = new THREE.Group();
+  eGun.position.set(0.42, 1.05, -0.1);
+  const eGunBody = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.22), eGunMat);
+  eGun.add(eGunBody);
+  const eGunBarrel = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.034, 0.14), eBarrMat);
+  eGunBarrel.position.z = -0.18;
+  eGun.add(eGunBarrel);
+  const eFlash = new THREE.Mesh(
+    new THREE.SphereGeometry(0.045, 6, 6),
+    new THREE.MeshBasicMaterial({ color: 0xffdd44 })
+  );
+  eFlash.position.z = -0.26;
+  eFlash.visible = false;
+  eGun.add(eFlash);
+  group.userData.gunFlash = eFlash;
+  group.add(eGun);
+
   group.traverse(c => { if (c.isMesh) c.castShadow = true; });
 
-  // Spara gruppen som target (kollision testas mot alla barn)
   targets.push(group);
   return group;
+}
+
+// --- Livsystem ---
+let playerHP = 100;
+let damageCooldown = 0;
+let gameOver = false;
+const hpEl         = document.getElementById('hp');
+const damageFlash  = document.getElementById('damage-flash');
+const gameoverEl   = document.getElementById('gameover');
+const finalScoreEl = document.getElementById('final-score');
+
+function takeDamage(amount) {
+  if (gameOver) return;
+  playerHP = Math.max(0, playerHP - amount);
+  hpEl.textContent = playerHP;
+
+  // Starta om animationen varje gång
+  damageFlash.classList.remove('active');
+  void damageFlash.offsetWidth;
+  damageFlash.classList.add('active');
+
+  if (playerHP <= 0) {
+    gameOver = true;
+    finalScoreEl.textContent = score;
+    gameoverEl.classList.remove('hidden');
+    document.getElementById('hud').style.display = 'none';
+    document.getElementById('bottom-right').style.display = 'none';
+    controls.unlock();
+  }
 }
 
 // --- Mode ---
@@ -282,30 +353,81 @@ const modeEl = document.getElementById('mode');
 document.addEventListener('keydown', e => {
   if (e.code === 'KeyM') {
     movingMode = !movingMode;
-    modeEl.textContent = movingMode ? 'Rörligt' : 'Statiskt';
+    modeEl.textContent = movingMode ? 'Jaga' : 'Statiskt';
   }
 });
 
 function randomPos() { return Math.random() * 44 - 22; }
-function randomDir() {
-  const a = Math.random() * Math.PI * 2;
-  return new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
-}
 
 function spawnAll() {
-  for (let i = 0; i < 5; i++) makePerson(randomPos(), randomPos());
+  for (let i = 0; i < 3; i++) {
+    const pos = randomValidPos();
+    makePerson(pos.x, pos.z);
+  }
 }
 
 const PERSON_SPEED = 2.5;
+const DAMAGE_RANGE = 1.2;  // avstånd (meter) för att träffa spelaren
+
+// Vinklar fienden provar i ordning när den kör fast
+const STEER_OPTS = [0, 65, -65, 105, -105, 145, -145];
 
 function updatePersons(dt) {
-  if (!movingMode) return;
+  if (!movingMode || gameOver) return;
+  if (damageCooldown > 0) damageCooldown -= dt;
+
   for (const p of targets) {
-    if (!p.userData.dir) p.userData.dir = randomDir();
+    const dx = camera.position.x - p.position.x;
+    const dz = camera.position.z - p.position.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+
+    if (dist < DAMAGE_RANGE) {
+      if (damageCooldown <= 0) { takeDamage(10); damageCooldown = 1.0; }
+      continue;
+    }
+
+    // Initiera state
+    if (p.userData.steerOffset === undefined) {
+      p.userData.steerOffset  = 0;
+      p.userData.steerTime    = 0;
+      p.userData.steerIdx     = 0;
+      p.userData.progressTimer = 0;
+      p.userData.lastDist     = dist;
+    }
+
+    if (p.userData.steerTime > 0) {
+      p.userData.steerTime -= dt;
+    } else {
+      p.userData.steerOffset = 0;
+    }
+
+    // Kolla progress var 0.5s — har fienden kommit närmre?
+    p.userData.progressTimer += dt;
+    if (p.userData.progressTimer >= 0.5) {
+      if (dist < p.userData.lastDist - 0.3) {
+        // Bra framsteg — återställ till direkt riktning
+        p.userData.steerIdx    = 0;
+        p.userData.steerOffset = 0;
+        p.userData.steerTime   = 0;
+      } else {
+        // Ingen framsteg — prova nästa vinkel i listan
+        p.userData.steerIdx = (p.userData.steerIdx + 1) % STEER_OPTS.length;
+        p.userData.steerOffset = STEER_OPTS[p.userData.steerIdx];
+        p.userData.steerTime   = 0.6;
+      }
+      p.userData.lastDist      = dist;
+      p.userData.progressTimer = 0;
+    }
+
+    // Beräkna rörelseriktning med steering-offset
+    const baseAngle  = Math.atan2(dx, dz);
+    const steerAngle = baseAngle + p.userData.steerOffset * Math.PI / 180;
+    const dirX = Math.sin(steerAngle);
+    const dirZ = Math.cos(steerAngle);
 
     const step = PERSON_SPEED * dt;
-    const nx = p.position.x + p.userData.dir.x * step;
-    const nz = p.position.z + p.userData.dir.z * step;
+    const nx = p.position.x + dirX * step;
+    const nz = p.position.z + dirZ * step;
 
     const hitX = hasCollision(nx, p.position.z, 0.35);
     const hitZ = hasCollision(p.position.x, nz, 0.35);
@@ -313,31 +435,25 @@ function updatePersons(dt) {
     if (!hitX) p.position.x = nx;
     if (!hitZ) p.position.z = nz;
 
-    if (hitX || hitZ || Math.random() < dt / 3) {
-      p.userData.dir = randomDir();
+    // Helt blockerad på nuvarande vinkel — byt direkt till nästa
+    if (hitX && hitZ) {
+      p.userData.steerIdx    = (p.userData.steerIdx + 1) % STEER_OPTS.length;
+      p.userData.steerOffset = STEER_OPTS[p.userData.steerIdx];
+      p.userData.steerTime   = 0.6;
     }
 
-    const lookTarget = p.position.clone().add(p.userData.dir);
-    p.lookAt(lookTarget);
+    p.lookAt(camera.position.x, p.position.y, camera.position.z);
+
+    if (p.userData.shootTimer === undefined) p.userData.shootTimer = Math.random() * ENEMY_SHOOT_INTERVAL;
+    p.userData.shootTimer -= dt;
+    if (p.userData.shootTimer <= 0 && dist > DAMAGE_RANGE && dist < 30) {
+      spawnEnemyBullet(p);
+      p.userData.shootTimer = ENEMY_SHOOT_INTERVAL;
+    }
   }
 }
 
 spawnAll();
-
-// --- Kollision ---
-// Förberäknade AABB för alla väggar/lådor (statiska objekt)
-const wallBoxes = walls.map(w => new THREE.Box3().setFromObject(w));
-
-function hasCollision(x, z, halfW = 0.4) {
-  const box = new THREE.Box3(
-    new THREE.Vector3(x - halfW, 0.05, z - halfW),
-    new THREE.Vector3(x + halfW, 2.2,  z + halfW)
-  );
-  for (const wb of wallBoxes) {
-    if (box.intersectsBox(wb)) return true;
-  }
-  return false;
-}
 
 // --- Controls ---
 const controls = new PointerLockControls(camera, document.body);
@@ -346,7 +462,7 @@ scene.add(controls.object);
 const blocker = document.getElementById('blocker');
 blocker.addEventListener('click', () => controls.lock());
 controls.addEventListener('lock',   () => blocker.classList.add('hidden'));
-controls.addEventListener('unlock', () => blocker.classList.remove('hidden'));
+controls.addEventListener('unlock', () => { if (!gameOver) blocker.classList.remove('hidden'); });
 
 // --- Movement ---
 const keys = {};
@@ -367,6 +483,27 @@ const scoreEl = document.getElementById('score');
 
 let recoil = 0;
 let flashTimer = 0;
+
+// Ammo
+const MAX_AMMO = 12;
+let ammo = MAX_AMMO;
+let reloading = false;
+let reloadTimer = 0;
+const RELOAD_TIME = 1.5;
+const ammoEl      = document.getElementById('ammo');
+const ammoDisplay = document.getElementById('ammo-display');
+
+function reload() {
+  if (reloading || ammo === MAX_AMMO) return;
+  reloading = true;
+  reloadTimer = RELOAD_TIME;
+  ammoEl.textContent = 'Laddar...';
+  ammoDisplay.classList.add('reloading');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'KeyR' && controls.isLocked && !gameOver) reload();
+});
 
 // Bullets
 const BULLET_SPEED = 40;
@@ -394,7 +531,11 @@ function spawnBullet() {
 }
 
 document.addEventListener('mousedown', e => {
-  if (!controls.isLocked || e.button !== 0) return;
+  if (!controls.isLocked || e.button !== 0 || gameOver || reloading || ammo <= 0) return;
+
+  ammo--;
+  ammoEl.textContent = ammo;
+  if (ammo === 0) reload();
 
   recoil = 0.06;
   muzzleFlash.visible = true;
@@ -433,6 +574,68 @@ function updateBullets(dt) {
     if (remove) {
       scene.remove(b.mesh);
       activeBullets.splice(i, 1);
+    }
+  }
+}
+
+// --- Fiendens skott ---
+const ENEMY_SHOOT_INTERVAL = 2.0;
+const ENEMY_BULLET_SPEED   = 18;
+const ENEMY_BULLET_MAX_DIST = 65;
+const enemyBulletGeo = new THREE.CylinderGeometry(0.028, 0.028, 0.2, 6);
+enemyBulletGeo.rotateX(Math.PI / 2);
+const enemyBulletMat = new THREE.MeshBasicMaterial({ color: 0xff3333 });
+const activeEnemyBullets = [];
+
+function spawnEnemyBullet(person) {
+  const mesh = new THREE.Mesh(enemyBulletGeo, enemyBulletMat);
+  mesh.position.set(person.position.x, 1.4, person.position.z);
+
+  const dir = new THREE.Vector3(
+    camera.position.x - person.position.x,
+    camera.position.y - 1.4,
+    camera.position.z - person.position.z
+  ).normalize();
+
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+  scene.add(mesh);
+  activeEnemyBullets.push({ mesh, dir, dist: 0 });
+
+  if (person.userData.gunFlash) {
+    person.userData.gunFlash.visible = true;
+    setTimeout(() => { if (person.userData.gunFlash) person.userData.gunFlash.visible = false; }, 80);
+  }
+}
+
+function updateEnemyBullets(dt) {
+  for (let i = activeEnemyBullets.length - 1; i >= 0; i--) {
+    const b = activeEnemyBullets[i];
+    const oldPos = b.mesh.position.clone();
+
+    b.mesh.position.addScaledVector(b.dir, ENEMY_BULLET_SPEED * dt);
+    b.dist += ENEMY_BULLET_SPEED * dt;
+
+    let remove = b.dist > ENEMY_BULLET_MAX_DIST;
+
+    if (!remove) {
+      // Swept check: närmaste punkt på rörelselinjen till kameran
+      const step = new THREE.Vector3().subVectors(b.mesh.position, oldPos);
+      const toCamera = new THREE.Vector3().subVectors(camera.position, oldPos);
+      const t = THREE.MathUtils.clamp(toCamera.dot(step) / step.lengthSq(), 0, 1);
+      const closest = oldPos.clone().addScaledVector(step, t);
+      if (closest.distanceTo(camera.position) < 0.55) {
+        takeDamage(15);
+        remove = true;
+      }
+    }
+
+    if (!remove && hasCollision(b.mesh.position.x, b.mesh.position.z, 0.1)) {
+      remove = true;
+    }
+
+    if (remove) {
+      scene.remove(b.mesh);
+      activeEnemyBullets.splice(i, 1);
     }
   }
 }
@@ -487,10 +690,22 @@ function animate() {
     camera.position.z = THREE.MathUtils.clamp(camera.position.z, -29, 29);
   }
 
+  // Laddning
+  if (reloading) {
+    reloadTimer -= dt;
+    if (reloadTimer <= 0) {
+      ammo = MAX_AMMO;
+      reloading = false;
+      ammoEl.textContent = ammo;
+      ammoDisplay.classList.remove('reloading');
+    }
+  }
+
   updateBullets(dt);
+  updateEnemyBullets(dt);
   updatePersons(dt);
 
-  if (targets.length === 0) spawnAll();
+  if (targets.length === 0 && !gameOver) spawnAll();
 
   // Vapen-pivot följer kameran
   weaponPivot.position.copy(camera.position);

@@ -29,12 +29,12 @@ Det här dokumentet kopplar varje krav från projektbeskrivningen till var i kod
 
 | # | Krav | Status | Var i koden |
 |---|------|--------|-------------|
-| 15 | Fiender rör sig mot spelaren (chase AI) | ⬜ Ej klar | Planeras i `updatePersons()` — jämför figur-position med `camera.position` |
-| 16 | Livsystem — spelaren har HP | ⬜ Ej klar | Planeras som `playerHP = 100` i `main.js` |
-| 17 | Spelaren tar skada när fiende är nära | ⬜ Ej klar | Planeras som `takeDamage()` funktion i `main.js` |
-| 18 | HP-display i HUD | ⬜ Ej klar | Planeras i `index.html` — ny `<span id="hp">` |
-| 19 | Skärmen blinkar rött vid skada | ⬜ Ej klar | Planeras som CSS-overlay med animation i `index.html` |
-| 20 | Game over-skärm med omstart | ⬜ Ej klar | Planeras som ny `div#gameover` i `index.html` + logik i `main.js` |
+| 15 | Fiender rör sig mot spelaren (chase AI) | ✅ Klar | `main.js` — `updatePersons()` beräknar riktningsvektor mot `camera.position` varje frame |
+| 16 | Livsystem — spelaren har HP | ✅ Klar | `main.js` — `playerHP = 100`, minskas i `takeDamage(amount)` |
+| 17 | Spelaren tar skada när fiende är nära | ✅ Klar | `main.js` — `updatePersons()` kontrollerar avstånd < `DAMAGE_RANGE`, med `damageCooldown` |
+| 18 | HP-display i HUD | ✅ Klar | `index.html` — `<span id="hp">`, uppdateras i `takeDamage()` via `hpEl.textContent` |
+| 19 | Skärmen blinkar rött vid skada | ✅ Klar | `index.html` — `#damage-flash` div med CSS `@keyframes flash`, återstartas med reflow-trick |
+| 20 | Game over-skärm med omstart | ✅ Klar | `index.html` — `div#gameover`, visas när `playerHP <= 0`; knapp anropar `location.reload()` |
 
 ---
 
@@ -59,4 +59,4 @@ Det här dokumentet kopplar varje krav från projektbeskrivningen till var i kod
 
 ---
 
-*Senast uppdaterad: 2026-05-29*
+*Senast uppdaterad: 2026-05-29 — Checkpoint 2 klar*

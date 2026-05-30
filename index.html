@@ -40,17 +40,75 @@
       text-shadow: 1px 1px 3px black;
       pointer-events: none; z-index: 5;
     }
+
+    #bottom-right {
+      position: fixed; bottom: 24px; right: 24px;
+      display: flex; gap: 24px; align-items: center;
+      pointer-events: none; z-index: 5;
+    }
+    #hp-display {
+      color: white; font-size: 22px; font-weight: bold;
+      text-shadow: 1px 1px 4px black;
+    }
+
+    #ammo-display {
+      color: white; font-size: 22px; font-weight: bold;
+      text-shadow: 1px 1px 4px black;
+    }
+    #ammo-display.reloading { color: #ffcc44; }
+
+    #damage-flash {
+      position: fixed; inset: 0;
+      background: rgba(200, 0, 0, 0.45);
+      pointer-events: none; z-index: 6;
+      opacity: 0;
+    }
+    #damage-flash.active {
+      animation: flash 0.35s ease-out forwards;
+    }
+    @keyframes flash {
+      0%   { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    #gameover {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.88);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      color: white; z-index: 20;
+    }
+    #gameover.hidden { display: none; }
+    #gameover h1 { font-size: 72px; color: #ff3333; margin-bottom: 12px; letter-spacing: 4px; }
+    #gameover p  { font-size: 24px; margin-bottom: 32px; color: #ccc; }
+    #gameover button {
+      font-size: 20px; padding: 14px 40px;
+      background: #ff3333; color: white;
+      border: none; cursor: pointer; border-radius: 6px;
+      letter-spacing: 1px;
+    }
+    #gameover button:hover { background: #cc2222; }
   </style>
 </head>
 <body>
   <div id="blocker">
     <h1>SHOTGAME</h1>
-    <p>Klicka för att spela &nbsp;|&nbsp; WASD = rörelse &nbsp;|&nbsp; Mus = sikta &nbsp;|&nbsp; Klick = skjut</p>
+    <p>Klicka för att spela &nbsp;|&nbsp; WASD = rörelse &nbsp;|&nbsp; Mus = sikta &nbsp;|&nbsp; Klick = skjut &nbsp;|&nbsp; R = ladda om</p>
   </div>
   <div id="crosshair"></div>
+  <div id="damage-flash"></div>
+  <div id="gameover" class="hidden">
+    <h1>GAME OVER</h1>
+    <p>Du träffade <span id="final-score">0</span> fiender</p>
+    <button onclick="location.reload()">Starta om</button>
+  </div>
   <div id="hud">
     Träffar: <span id="score">0</span><br>
     Läge: <span id="mode">Statiskt</span> &nbsp;<small style="color:#aaa">[M] byt</small>
+  </div>
+  <div id="bottom-right">
+    <div id="hp-display">❤ <span id="hp">100</span>/100</div>
+    <div id="ammo-display">&#128299; <span id="ammo">12</span>/12</div>
   </div>
   <script type="module" src="/src/main.js"></script>
 </body>
