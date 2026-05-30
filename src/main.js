@@ -339,9 +339,11 @@ function takeDamage(amount) {
   if (playerHP <= 0) {
     gameOver = true;
     finalScoreEl.textContent = score;
+    finalTimeEl.textContent  = formatTime(survivalTime);
     gameoverEl.classList.remove('hidden');
     document.getElementById('hud').style.display = 'none';
     document.getElementById('bottom-right').style.display = 'none';
+    timerEl.style.display = 'none';
     controls.unlock();
   }
 }
@@ -459,10 +461,44 @@ spawnAll();
 const controls = new PointerLockControls(camera, document.body);
 scene.add(controls.object);
 
-const blocker = document.getElementById('blocker');
-blocker.addEventListener('click', () => controls.lock());
-controls.addEventListener('lock',   () => blocker.classList.add('hidden'));
-controls.addEventListener('unlock', () => { if (!gameOver) blocker.classList.remove('hidden'); });
+const blocker    = document.getElementById('blocker');
+const startMenu  = document.getElementById('start-menu');
+const pauseMenu  = document.getElementById('pause-menu');
+
+const timerEl    = document.getElementById('timer');
+const finalTimeEl = document.getElementById('final-time');
+
+let gameStarted   = false;
+let survivalTime  = 0;
+
+function formatTime(s) {
+  const m = Math.floor(s / 60).toString().padStart(2, '0');
+  const sec = Math.floor(s % 60).toString().padStart(2, '0');
+  return `${m}:${sec}`;
+}
+
+// Börja om-knapp — stoppa bubblingen så att blocker inte triggas
+document.getElementById('restart-btn').addEventListener('click', e => {
+  e.stopPropagation();
+});
+
+// Klick var som helst på blocker (inkl. startknappen) startar/återupptar spelet
+blocker.addEventListener('click', () => {
+  if (!gameOver) controls.lock();
+});
+
+controls.addEventListener('lock', () => {
+  gameStarted = true;
+  blocker.classList.add('hidden');
+});
+
+controls.addEventListener('unlock', () => {
+  if (gameOver) return;
+  // Visa pausmeny (inte startmeny) efter att spelet startat
+  startMenu.classList.add('hidden');
+  pauseMenu.classList.remove('hidden');
+  blocker.classList.remove('hidden');
+});
 
 // --- Movement ---
 const keys = {};
@@ -706,6 +742,12 @@ function animate() {
   updatePersons(dt);
 
   if (targets.length === 0 && !gameOver) spawnAll();
+
+  // Timer — räknar bara när spelet är igång och inte game over
+  if (gameStarted && controls.isLocked && !gameOver) {
+    survivalTime += dt;
+    timerEl.textContent = formatTime(survivalTime);
+  }
 
   // Vapen-pivot följer kameran
   weaponPivot.position.copy(camera.position);

@@ -16,8 +16,9 @@
 10. Hur fungerar kollisionen?
 11. Hur fungerar fiendernas AI (chase)?
 12. Hur fungerar livsystemet och game over?
-13. Lärdomar och utmaningar
-14. Reflektioner
+13. Hur fungerar startmenyn och timern?
+14. Lärdomar och utmaningar
+15. Reflektioner
 
 ---
 
@@ -326,7 +327,49 @@ Längst upp till vänster på skärmen syns alltid ❤ och aktuella HP, uppdater
 
 ---
 
-## 13. Lärdomar och utmaningar
+## 13. Hur fungerar startmenyn och timern?
+
+**Startmeny:**
+När spelet laddas visas en startskärm med spelets titel, en kontrollista och en grön "STARTA SPEL"-knapp. Spelet börjar inte förrän spelaren klickar — det ger tid att läsa kontrollerna.
+
+Om man trycker **Escape** under spelet visas en pausskärm i stället för startskärmen:
+
+```javascript
+controls.addEventListener('unlock', () => {
+    startMenu.classList.add('hidden');   // Dölj startskärmen
+    pauseMenu.classList.remove('hidden'); // Visa pausskärmen
+});
+```
+
+Det gör att man kan pausa och fortsätta utan att behöva se startskärmen igen.
+
+**Överlevnadstimer:**
+Timern räknar bara de sekunder man faktiskt spelar — den pausas automatiskt när musen är olåst:
+
+```javascript
+if (gameStarted && controls.isLocked && !gameOver) {
+    survivalTime += deltaTime;
+    timerEl.textContent = formatTime(survivalTime);
+}
+```
+
+`formatTime()` omvandlar sekunder till formatet `MM:SS` (t.ex. `01:45`).
+
+**Poäng-sammanfattning på game over:**
+När spelaren dör visas både antal träffade fiender och hur länge man överlevde:
+
+```
+GAME OVER
+Fiender träffade: 12
+Överlevnadstid:   01:45
+[Spela igen]
+```
+
+**Lärdom:** Att separera "startade" från "pausad" krävde en extra boolean (`gameStarted`). Utan den skulle spelet visa startmenyn varje gång man tryckte Escape.
+
+---
+
+## 14. Lärdomar och utmaningar
 
 ### Lärdomar
 

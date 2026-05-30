@@ -43,9 +43,9 @@ Det här dokumentet kopplar varje krav från projektbeskrivningen till var i kod
 | # | Krav | Status | Var i koden |
 |---|------|--------|-------------|
 | 21 | Vågsystem med ökande svårighet | ⬜ Ej klar | Planeras som `wave`-variabel, fler/snabbare figurer per våg |
-| 22 | Överlevnadstimer i HUD | ⬜ Ej klar | Planeras som `<span id="timer">` i `index.html` |
-| 23 | Poäng-sammanfattning på game over | ⬜ Ej klar | Planeras i `#gameover`-overlay |
-| 24 | Startmeny | ⬜ Ej klar | Planeras som ny startskärm i `index.html` |
+| 22 | Överlevnadstimer i HUD | ✅ Klar | `index.html` — `#timer` div uppe i mitten; `main.js` — `survivalTime += dt` i animate-loopen, `formatTime()` formaterar MM:SS |
+| 23 | Poäng-sammanfattning på game over | ✅ Klar | `index.html` — `#gameover` visar träffar + överlevnadstid; `main.js` — `finalTimeEl` och `finalScoreEl` sätts när HP = 0 |
+| 24 | Startmeny | ✅ Klar | `index.html` — `#start-menu` med titel, kontrollista och "STARTA SPEL"-knapp; pausmeny (`#pause-menu`) med "Börja om"-knapp |
 
 ---
 
@@ -59,4 +59,4 @@ Det här dokumentet kopplar varje krav från projektbeskrivningen till var i kod
 
 ---
 
-*Senast uppdaterad: 2026-05-29 — Checkpoint 2 klar*
+*Senast uppdaterad: 2026-05-30 — Startmeny, timer och poäng-sammanfattning klara*

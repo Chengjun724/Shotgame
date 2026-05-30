@@ -43,9 +43,9 @@ Från projektbeskrivningen: *"fiender med enkel AI samt ett fungerande livsystem
 Från projektbeskrivningen: *"ett fungerande spel där alla grundfunktioner finns på plats"*
 
 - [ ] **Vågrörelser** — svårigheten ökar per omgång (fler/snabbare fiender)
-- [ ] **Överlevnadstid** — visa hur länge spelaren klarat sig
-- [ ] **Poäng-sammanfattning** på game over-skärmen
-- [ ] **Startmeny** — enkel skärm innan spelet börjar
+- [x] **Överlevnadstid** — visa hur länge spelaren klarat sig
+- [x] **Poäng-sammanfattning** på game over-skärmen
+- [x] **Startmeny** — enkel skärm innan spelet börjar
 - [ ] Buggfritt och spelbart från start till slut
 
 ---
