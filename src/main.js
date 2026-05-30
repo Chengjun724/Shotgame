@@ -5,13 +5,14 @@ import { PointerLockControls } from 'three/addons/controls/PointerLockControls.j
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.autoClear = false; // vi hanterar clear manuellt för vapnet
 document.body.appendChild(renderer.domElement);
 
 // --- World scene ---
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x111111);
-scene.fog = new THREE.Fog(0x111111, 15, 55);
+scene.background = new THREE.Color(0x1a2035);
+scene.fog = new THREE.Fog(0x1a2035, 14, 52);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
 camera.position.set(0, 1.7, 0);
@@ -32,11 +33,11 @@ const gun = new THREE.Group();
 gun.position.set(0.22, -0.22, -0.42);
 weaponPivot.add(gun);
 
-const metalMat  = new THREE.MeshLambertMaterial({ color: 0x222222 });
-const darkMat   = new THREE.MeshLambertMaterial({ color: 0x111111 });
-const woodMat   = new THREE.MeshLambertMaterial({ color: 0x6b3a1f });
-const skinMat   = new THREE.MeshLambertMaterial({ color: 0xd4956a });
-const slideMat  = new THREE.MeshLambertMaterial({ color: 0x2d2d2d });
+const metalMat  = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.25, metalness: 0.85 });
+const darkMat   = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2,  metalness: 0.9  });
+const woodMat   = new THREE.MeshStandardMaterial({ color: 0x6b3a1f, roughness: 0.85, metalness: 0.0  });
+const skinMat   = new THREE.MeshStandardMaterial({ color: 0xd4956a, roughness: 0.75, metalness: 0.0  });
+const slideMat  = new THREE.MeshStandardMaterial({ color: 0x2d2d2d, roughness: 0.2,  metalness: 0.88 });
 
 // Pistolkropp (slide)
 const body = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.075, 0.26), slideMat);
@@ -74,7 +75,7 @@ arm.position.set(0, -0.13, 0.2);
 gun.add(arm);
 
 // Ärm (kläder)
-const sleeve = new THREE.Mesh(new THREE.BoxGeometry(0.074, 0.074, 0.22), new THREE.MeshLambertMaterial({ color: 0x3a5a8a }));
+const sleeve = new THREE.Mesh(new THREE.BoxGeometry(0.074, 0.074, 0.22), new THREE.MeshStandardMaterial({ color: 0x3a5a8a, roughness: 0.9, metalness: 0.0 }));
 sleeve.position.set(0, -0.13, 0.32);
 gun.add(sleeve);
 
@@ -96,19 +97,31 @@ muzzleFlash.visible = false;
 gun.add(muzzleFlash);
 
 // --- World lighting ---
-scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+scene.add(new THREE.AmbientLight(0xc0cce0, 0.55));
+
+// Riktningsljus (sol) med mjuka skuggor
+const sun = new THREE.DirectionalLight(0xfff3cc, 1.4);
+sun.position.set(12, 20, 8);
+sun.castShadow = true;
+sun.shadow.mapSize.width  = 2048;
+sun.shadow.mapSize.height = 2048;
+sun.shadow.camera.left   = -35; sun.shadow.camera.right = 35;
+sun.shadow.camera.top    =  35; sun.shadow.camera.bottom = -35;
+sun.shadow.camera.near   = 0.5; sun.shadow.camera.far   = 65;
+sun.shadow.bias = -0.001;
+scene.add(sun);
 
 function addLight(x, y, z, color = 0xffffff, intensity = 1.2) {
   const l = new THREE.PointLight(color, intensity, 28);
   l.position.set(x, y, z);
-  l.castShadow = true;
+  l.castShadow = false;
   scene.add(l);
 }
-addLight(0,   7,  0,  0xfff5e0, 1.5);   // center
-addLight(-20, 7, -20, 0xffe0c0, 1.0);   // NV
-addLight( 20, 7, -20, 0xffe0c0, 1.0);   // NÖ
-addLight(-20, 7,  20, 0xc0d0ff, 1.0);   // SV
-addLight( 20, 7,  20, 0xc0d0ff, 1.0);   // SÖ
+addLight(0,   7,  0,  0xfff5e0, 0.9);
+addLight(-20, 7, -20, 0xffe0c0, 0.6);
+addLight( 20, 7, -20, 0xffe0c0, 0.6);
+addLight(-20, 7,  20, 0xc0d0ff, 0.6);
+addLight( 20, 7,  20, 0xc0d0ff, 0.6);
 
 // --- Arena ---
 
@@ -127,9 +140,65 @@ function makeCheckerTexture() {
   return t;
 }
 
+function makeConcreteTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#888888';
+  ctx.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 4000; i++) {
+    const v = Math.floor(Math.random() * 50 - 25);
+    const col = Math.max(0, Math.min(255, 136 + v));
+    ctx.fillStyle = `rgb(${col},${col},${col})`;
+    ctx.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(3, 3);
+  return t;
+}
+
+function makeBrickTexture() {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 128;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#9a8878';
+  ctx.fillRect(0, 0, 256, 128);
+  const bW = 58, bH = 22, m = 4;
+  for (let row = 0; row < 7; row++) {
+    const off = row % 2 === 0 ? 0 : (bW + m) / 2;
+    for (let col = -1; col < 6; col++) {
+      const r = 150 + Math.floor(Math.random() * 35);
+      const g =  75 + Math.floor(Math.random() * 20);
+      const b =  45 + Math.floor(Math.random() * 20);
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(col * (bW + m) + off + m / 2, row * (bH + m) + m / 2, bW, bH);
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(4, 2);
+  return t;
+}
+
+function makeCrateTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#9b7a2e';
+  ctx.fillRect(0, 0, 128, 128);
+  ctx.strokeStyle = '#7a5a1a'; ctx.lineWidth = 3;
+  ctx.strokeRect(6, 6, 116, 116);
+  ctx.beginPath(); ctx.moveTo(64, 6); ctx.lineTo(64, 122); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(6, 64); ctx.lineTo(122, 64); ctx.stroke();
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
 const floor = new THREE.Mesh(
   new THREE.PlaneGeometry(60, 60),
-  new THREE.MeshLambertMaterial({ map: makeCheckerTexture() })
+  new THREE.MeshStandardMaterial({ map: makeCheckerTexture(), roughness: 0.9, metalness: 0.0 })
 );
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
@@ -138,16 +207,19 @@ scene.add(floor);
 // Tak
 const ceiling = new THREE.Mesh(
   new THREE.PlaneGeometry(60, 60),
-  new THREE.MeshLambertMaterial({ color: 0x222222, side: THREE.BackSide })
+  new THREE.MeshStandardMaterial({ color: 0x1e1e2a, roughness: 1.0, metalness: 0.0, side: THREE.BackSide })
 );
 ceiling.rotation.x = Math.PI / 2;
 ceiling.position.y = 8;
 scene.add(ceiling);
 
-const concreteMat = new THREE.MeshLambertMaterial({ color: 0x777777 });
-const brickMat    = new THREE.MeshLambertMaterial({ color: 0x7a5230 });
-const crateMat    = new THREE.MeshLambertMaterial({ color: 0x9b7a2e });
-const darkCrateMat = new THREE.MeshLambertMaterial({ color: 0x6b5520 });
+const concreteTex  = makeConcreteTexture();
+const brickTex     = makeBrickTexture();
+const crateTex     = makeCrateTexture();
+const concreteMat  = new THREE.MeshStandardMaterial({ map: concreteTex, roughness: 0.92, metalness: 0.0 });
+const brickMat     = new THREE.MeshStandardMaterial({ map: brickTex,    roughness: 0.95, metalness: 0.0 });
+const crateMat     = new THREE.MeshStandardMaterial({ map: crateTex,    roughness: 0.8,  metalness: 0.0 });
+const darkCrateMat = new THREE.MeshStandardMaterial({ map: crateTex,    color: 0x6b5520, roughness: 0.85, metalness: 0.0 });
 
 const walls = [];
 
@@ -261,10 +333,12 @@ function makePerson(x, z) {
   group.position.set(x, 0, z);
   scene.add(group);
 
-  const skin   = new THREE.MeshLambertMaterial({ color: 0xf4c28a });
-  const shirt  = new THREE.MeshLambertMaterial({ color: 0x2255cc });
-  const pants  = new THREE.MeshLambertMaterial({ color: 0x222244 });
-  const hair   = new THREE.MeshLambertMaterial({ color: 0x221100 });
+  const shirtColors = [0xcc2222, 0x22aa44, 0xcc8800, 0x882299, 0x229988, 0xcc5500, 0x2255cc];
+  const shirtColor  = shirtColors[Math.floor(Math.random() * shirtColors.length)];
+  const skin  = new THREE.MeshStandardMaterial({ color: 0xf4c28a, roughness: 0.8, metalness: 0.0 });
+  const shirt = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.9, metalness: 0.0 });
+  const pants = new THREE.MeshStandardMaterial({ color: 0x222244,  roughness: 0.9, metalness: 0.0 });
+  const hair  = new THREE.MeshStandardMaterial({ color: 0x221100,  roughness: 1.0, metalness: 0.0 });
 
   // Huvud
   const head = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.5, 0.45), skin);
