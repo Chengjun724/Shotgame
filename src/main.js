@@ -78,6 +78,16 @@ const sleeve = new THREE.Mesh(new THREE.BoxGeometry(0.074, 0.074, 0.22), new THR
 sleeve.position.set(0, -0.13, 0.32);
 gun.add(sleeve);
 
+// Magasin (sitter i greppet, animeras ut vid laddning)
+const magazine = new THREE.Mesh(new THREE.BoxGeometry(0.044, 0.13, 0.038), metalMat);
+magazine.position.set(0, -0.155, 0.062);
+gun.add(magazine);
+
+// Magasinets botten (synlig detalj)
+const magBase = new THREE.Mesh(new THREE.BoxGeometry(0.048, 0.012, 0.042), darkMat);
+magBase.position.set(0, -0.222, 0.062);
+gun.add(magBase);
+
 // Mynningsflamma (gömd tills man skjuter)
 const flashMat = new THREE.MeshBasicMaterial({ color: 0xffdd44 });
 const muzzleFlash = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6), flashMat);
@@ -361,15 +371,11 @@ document.addEventListener('keydown', e => {
 
 function randomPos() { return Math.random() * 44 - 22; }
 
-function spawnAll() {
-  for (let i = 0; i < 3; i++) {
-    const pos = randomValidPos();
-    makePerson(pos.x, pos.z);
-  }
-}
 
 const PERSON_SPEED = 2.5;
-const DAMAGE_RANGE = 1.2;  // avstånd (meter) för att träffa spelaren
+const DAMAGE_RANGE = 1.2;
+const MAX_ENEMIES  = 3;
+let spawnTimer = 0;
 
 // Vinklar fienden provar i ordning när den kör fast
 const STEER_OPTS = [0, 65, -65, 105, -105, 145, -145];
@@ -454,8 +460,6 @@ function updatePersons(dt) {
     }
   }
 }
-
-spawnAll();
 
 // --- Controls ---
 const controls = new PointerLockControls(camera, document.body);
@@ -741,7 +745,14 @@ function animate() {
   updateEnemyBullets(dt);
   updatePersons(dt);
 
-  if (targets.length === 0 && !gameOver) spawnAll();
+  if (!gameOver && targets.length < MAX_ENEMIES) {
+    spawnTimer -= dt;
+    if (spawnTimer <= 0) {
+      const pos = randomValidPos();
+      makePerson(pos.x, pos.z);
+      spawnTimer = 3.0; // vänta 3s innan nästa spawn
+    }
+  }
 
   // Timer — räknar bara när spelet är igång och inte game over
   if (gameStarted && controls.isLocked && !gameOver) {
@@ -753,26 +764,66 @@ function animate() {
   weaponPivot.position.copy(camera.position);
   weaponPivot.quaternion.copy(camera.quaternion);
 
-  // Bob när man går
-  if (moving && controls.isLocked) {
-    bobTime += dt * 8;
-    gun.position.y = -0.22 + Math.sin(bobTime) * 0.012;
-    gun.rotation.z = Math.sin(bobTime * 0.5) * 0.018;
-  } else {
-    bobTime = 0;
-    gun.position.y = THREE.MathUtils.lerp(gun.position.y, -0.22, dt * 8);
-    gun.rotation.z = THREE.MathUtils.lerp(gun.rotation.z, 0, dt * 8);
-  }
+  if (reloading) {
+    const progress = 1 - (reloadTimer / RELOAD_TIME); // 0 → 1
 
-  // Recoyl (pistolen hoppar bakåt och återgår)
-  if (recoil > 0) {
-    gun.position.z = -0.42 + recoil;
-    gun.rotation.x = -recoil * 1.5;
-    recoil = THREE.MathUtils.lerp(recoil, 0, dt * 18);
-    if (recoil < 0.001) recoil = 0;
+    if (progress < 0.30) {
+      // Fas 1: vapnet vinklas mot spelaren så magasinbrunnen syns
+      const t = progress / 0.30;
+      gun.position.y = THREE.MathUtils.lerp(-0.22, -0.32, t);
+      gun.position.x = THREE.MathUtils.lerp( 0.22,  0.26, t);
+      gun.rotation.x = THREE.MathUtils.lerp( 0,     1.15, t); // tippar greppet mot kameran
+      gun.rotation.z = THREE.MathUtils.lerp( 0,    -0.30, t);
+      // Magasin börjar åka ut
+      magazine.position.y = THREE.MathUtils.lerp(-0.155, -0.155, t);
+      magBase.position.y  = THREE.MathUtils.lerp(-0.222, -0.222, t);
+    } else if (progress < 0.52) {
+      // Fas 2: magasinet åker ut nedåt
+      const t = (progress - 0.30) / 0.22;
+      gun.position.y = -0.32; gun.position.x = 0.26;
+      gun.rotation.x = 1.15;  gun.rotation.z = -0.30;
+      magazine.position.y = THREE.MathUtils.lerp(-0.155, -0.38, t);
+      magBase.position.y  = THREE.MathUtils.lerp(-0.222, -0.45, t);
+    } else if (progress < 0.72) {
+      // Fas 3: nytt magasin åker in
+      const t = (progress - 0.52) / 0.20;
+      gun.position.y = -0.32; gun.position.x = 0.26;
+      gun.rotation.x = 1.15;  gun.rotation.z = -0.30;
+      magazine.position.y = THREE.MathUtils.lerp(-0.38,  -0.155, t);
+      magBase.position.y  = THREE.MathUtils.lerp(-0.45,  -0.222, t);
+    } else {
+      // Fas 4: vapnet åker tillbaka till startläget
+      const t = (progress - 0.72) / 0.28;
+      gun.position.y = THREE.MathUtils.lerp(-0.32, -0.22, t);
+      gun.position.x = THREE.MathUtils.lerp( 0.26,  0.22, t);
+      gun.rotation.x = THREE.MathUtils.lerp( 1.15,  0,    t);
+      gun.rotation.z = THREE.MathUtils.lerp(-0.30,  0,    t);
+      magazine.position.y = -0.155;
+      magBase.position.y  = -0.222;
+    }
+    gun.position.z = -0.42;
   } else {
-    gun.position.z = THREE.MathUtils.lerp(gun.position.z, -0.42, dt * 12);
-    gun.rotation.x = THREE.MathUtils.lerp(gun.rotation.x, 0, dt * 12);
+    // Bob när man går
+    if (moving && controls.isLocked) {
+      bobTime += dt * 8;
+      gun.position.y = -0.22 + Math.sin(bobTime) * 0.012;
+      gun.rotation.z = Math.sin(bobTime * 0.5) * 0.018;
+    } else {
+      bobTime = 0;
+      gun.position.y = THREE.MathUtils.lerp(gun.position.y, -0.22, dt * 8);
+      gun.rotation.z = THREE.MathUtils.lerp(gun.rotation.z, 0, dt * 8);
+    }
+
+    // Rekyl
+    if (recoil > 0) {
+      gun.position.z = -0.42 + recoil;
+      gun.rotation.x = -recoil * 1.5;
+      recoil = THREE.MathUtils.lerp(recoil, 0, dt * 18);
+      if (recoil < 0.001) recoil = 0;
+    } else {
+      gun.position.z = THREE.MathUtils.lerp(gun.position.z, -0.42, dt * 12);
+      gun.rotation.x = THREE.MathUtils.lerp(gun.rotation.x, 0, dt * 12);
+    }
   }
 
   // Mynningsflamma
